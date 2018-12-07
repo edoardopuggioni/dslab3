@@ -30,8 +30,8 @@ try:
     # Dictionary to store all entries of the blackboard.
     board = {}
 
-    # Variable to know the next ID to use for each new entry.
-    id = 0
+    # Logical clock
+    clock = 0
 
     # ------------------------------------------------------------------------------------------------------
     # BOARD FUNCTIONS
@@ -52,7 +52,6 @@ try:
 
         return success
 
-
     def modify_element_in_store(entry_sequence, modified_element, is_propagated_call=False):
 
         global board, node_id
@@ -67,7 +66,6 @@ try:
             print e
 
         return success
-
 
     def delete_element_from_store(entry_sequence, is_propagated_call=False):
 
@@ -84,11 +82,12 @@ try:
 
         return success
 
-
     # ------------------------------------------------------------------------------------------------------
     # DISTRIBUTED COMMUNICATIONS FUNCTIONS
     # ------------------------------------------------------------------------------------------------------
+
     def contact_vessel(vessel_ip, path, payload=None, req='POST'):
+
         # Try to contact another server (vessel) through a POST or GET, once
         success = False
         try:
@@ -106,7 +105,6 @@ try:
             print e
         return success
 
-
     def propagate_to_vessels(path, payload=None, req='POST'):
         global vessel_list, node_id
 
@@ -115,7 +113,6 @@ try:
                 success = contact_vessel(vessel_ip, path, payload, req)
                 if not success:
                     print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
-
 
     # ------------------------------------------------------------------------------------------------------
     # ROUTES
@@ -126,38 +123,55 @@ try:
     @app.route('/')
     def index():
         global board, node_id
+
+        # board_display = {}
+        # i = 0
+        # for key in sorted(board.iteritems()):
+        #     board_display[str(i)] = board[key]
+        #     i += 1
+
         return template('server/index.tpl', board_title='Vessel {}'.format(node_id),
                         board_dict=sorted(board.iteritems()), members_name_string='YOUR NAME')
-
 
     @app.get('/board')
     def get_board():
         global board, node_id
         print board
+
+        # board_display = {}
+        # i = 0
+        # for key in sorted(board.iteritems()):
+        #     board_display[str(i)] = board[key]
+        #     i += 1
+
         return template('server/boardcontents_template.tpl', board_title='Vessel {}'.format(node_id),
                         board_dict=sorted(board.iteritems()))
 
     # ------------------------------------------------------------------------------------------------------
+
     @app.post('/board')
     def client_add_received():
 
         # Adds a new element to the board
         # Called directly when a user is doing a POST request on /board
 
-        global board, node_id, id
+        global board, node_id, id, clock, vessel_list, node_id
 
         try:
 
             new_entry = request.forms.get('entry')
 
+            # Increment clock before event
+            clock += 1
+
+            # Build stamp which will serve both as a key for the board dictionary.
+            stamp = str(clock) + str(node_id)
+
             # We add new element to dictionary using id as entry sequence.
-            add_new_element_to_store(str(id), new_entry)
+            add_new_element_to_store(str(stamp), new_entry)
 
             # Build path to propagate, using key word "add" and id as element_id.
-            path = "/propagate/add/" + str(id)
-
-            # Increment id for the next use of this function.
-            id += 1
+            path = "/propagate/add/" + str(clock) + '/' + str(node_id)
 
             # Start thread so the server doesn't make the client wait.
             thread = Thread(target=propagate_to_vessels, args=(path, new_entry,))
@@ -169,7 +183,6 @@ try:
             print e
 
         return False
-
 
     @app.post('/board/<element_id:int>/')
     def client_action_received(element_id):
@@ -207,33 +220,37 @@ try:
 
         pass
 
+    @app.post('/propagate/<action>/<msg_timestamp>/<msg_id>')
+    def propagation_received(action, msg_timestamp, msg_id):
 
-    @app.post('/propagate/<action>/<element_id>')
-    def propagation_received(action, element_id):
-
-        global id
+        global clock, node_id
 
         # Propagate action. An action is distinguished using one of the three keywords "add", "mod" and "del", which
         # stand for add, modify and delete respectively. After identifying the action, we identify the entry to
         # add/modify/delete by using the variable element_id, and also in the case of add and modify, the new entry can
         # be retrieved from the body of the POST request.
 
+        if int(msg_timestamp) > clock:
+            clock = int(msg_timestamp)
+        clock += 1
+
+        new_stamp = str(msg_timestamp) + str(msg_id)
+
         if action == "add":
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
-            add_new_element_to_store(element_id, entry)
-            id += 1
+            print "ADDING AN ELEMENT TO THE BOARD"
+            add_new_element_to_store(new_stamp, entry)
 
         if action == "mod":
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
-            modify_element_in_store(element_id, entry)
+            modify_element_in_store(new_stamp, entry)
 
         if action == "del":
-            delete_element_from_store(entry_sequence=element_id)
+            delete_element_from_store(entry_sequence=new_stamp)
 
         pass
-
 
     # ------------------------------------------------------------------------------------------------------
     # EXECUTION
@@ -258,7 +275,6 @@ try:
             run(app, host=vessel_list[str(node_id)], port=port)
         except Exception as e:
             print e
-
 
     # ------------------------------------------------------------------------------------------------------
     if __name__ == '__main__':
