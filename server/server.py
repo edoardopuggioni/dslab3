@@ -33,6 +33,23 @@ try:
     # Logical clock
     clock = 0
 
+    mod_queue = {}
+
+    del_queue = {}
+
+    def check_mod_queue():
+        global mod_queue
+        for key, value in mod_queue:
+            if key in board:
+                modify_element_in_store(key, value)
+                del mod_queue[key]
+
+    def check_del_queue():
+        for key in del_queue:
+            if key in board:
+                delete_element_from_store(key)
+                del del_queue[key]
+
     # ------------------------------------------------------------------------------------------------------
     # BOARD FUNCTIONS
     # ------------------------------------------------------------------------------------------------------
@@ -54,7 +71,7 @@ try:
 
     def modify_element_in_store(entry_sequence, modified_element, is_propagated_call=False):
 
-        global board, node_id
+        global board, node_id, mod_queue
         success = False
 
         try:
@@ -69,7 +86,7 @@ try:
 
     def delete_element_from_store(entry_sequence, is_propagated_call=False):
 
-        global board, node_id
+        global board, node_id, del_queue
         success = False
 
         try:
@@ -122,15 +139,10 @@ try:
 
     @app.route('/')
     def index():
-        global board, node_id
+        global board, node_id, mod_queue
 
-        # Following building of board_display was thought to have a "good looking" way of displaying the IDs in the
-        # web-application, but we need to keep the "ugly" IDs to maintain them unique.
-        # board_display = {}
-        # i = 0
-        # for key in sorted(board.iteritems()):
-        #     board_display[str(i)] = board[key]
-        #     i += 1
+        check_mod_queue()
+        check_mod_queue()
 
         return template('server/index.tpl', board_title='Vessel {}'.format(node_id),
                         board_dict=sorted(board.iteritems()), members_name_string='YOUR NAME')
@@ -138,10 +150,12 @@ try:
     @app.get('/board')
     def get_board():
         global board, node_id
-        print board
 
-        # Following building of board_display was thought to have a "good looking" way of displaying the IDs in the
-        # web-application, but we need to keep the "ugly" IDs to maintain them unique.
+        check_mod_queue()
+        check_mod_queue()
+
+        # The following code to build board_display was meant for having a "good looking" way of displaying the IDs in
+        # the web-application (IDs going 0, 1, 2, etc.) but we need to keep the "ugly" IDs to maintain them unique.
         # board_display = {}
         # i = 0
         # for key in sorted(board.iteritems()):
@@ -240,7 +254,7 @@ try:
     @app.post('/propagate/<action>/<msg_timestamp>/<msg_id>')
     def propagation_received(action, msg_timestamp, msg_id):
 
-        global clock, node_id
+        global clock, node_id, mod_queue, del_queue
 
         # Propagate action. An action is distinguished using one of the three keywords "add", "mod" and "del", which
         # stand for add, modify and delete respectively. After identifying the action, we identify the entry to
@@ -259,10 +273,18 @@ try:
         if action == "mod":
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
-            modify_element_in_store(msg_id, entry)
+
+            if msg_id not in board:
+                mod_queue[msg_id] = entry
+            else:
+                modify_element_in_store(msg_id, entry)
 
         if action == "del":
-            delete_element_from_store(entry_sequence=msg_idS)
+
+            if msg_id not in board:
+                del_queue[msg_id] = 1
+            else:
+                delete_element_from_store(entry_sequence=msg_id)
 
         pass
 
