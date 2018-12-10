@@ -37,18 +37,41 @@ try:
 
     del_queue = {}
 
+    # Dictionary similar to board, used only to display the board on the web-app, to hide the internal IDs of the
+    # entries, showing instead simple sequence numbers 1, 2, 3, and so on.
+    board_display = {}
+
+    # Dictionary to map sequnce numbers to internal IDs.
+    seq_to_id = {}
+
     def check_mod_queue():
         global mod_queue
         for key, value in mod_queue:
             if key in board:
                 modify_element_in_store(key, value)
                 del mod_queue[key]
+        return
 
     def check_del_queue():
         for key in del_queue:
             if key in board:
                 delete_element_from_store(key)
                 del del_queue[key]
+        return
+
+    def update_board_display():
+
+        global board, board_display, seq_to_id
+
+        board_display = {}
+        seq_to_id = {}
+        i = 1
+        for key, value in sorted(board.iteritems()):
+            board_display[i] = value
+            seq_to_id[i] = key
+            i += 1
+
+        return
 
     # ------------------------------------------------------------------------------------------------------
     # BOARD FUNCTIONS
@@ -139,39 +162,35 @@ try:
 
     @app.route('/')
     def index():
-        global board, node_id, mod_queue
+        global board, node_id, board_display, seq_to_id
 
         check_mod_queue()
-        check_mod_queue()
+        check_del_queue()
+
+        update_board_display()
 
         return template('server/index.tpl', board_title='Vessel {}'.format(node_id),
-                        board_dict=sorted(board.iteritems()), members_name_string='YOUR NAME')
+                        board_dict=sorted(board_display.iteritems()), members_name_string='YOUR NAME')
 
     @app.get('/board')
     def get_board():
-        global board, node_id
+        global board, node_id, board_display, seq_to_id
 
         check_mod_queue()
-        check_mod_queue()
+        check_del_queue()
 
-        # The following code to build board_display was meant for having a "good looking" way of displaying the IDs in
-        # the web-application (IDs going 0, 1, 2, etc.) but we need to keep the "ugly" IDs to maintain them unique.
-        # board_display = {}
-        # i = 0
-        # for key in sorted(board.iteritems()):
-        #     board_display[str(i)] = board[key]
-        #     i += 1
+        update_board_display()
 
         return template('server/boardcontents_template.tpl', board_title='Vessel {}'.format(node_id),
-                        board_dict=sorted(board.iteritems()))
+                        board_dict=sorted(board_display.iteritems()))
 
     # ------------------------------------------------------------------------------------------------------
 
     @app.post('/board')
     def client_add_received():
 
-        # Adds a new element to the board
-        # Called directly when a user is doing a POST request on /board
+        # Adds a new element to the board.
+        # Called directly when a user is doing a POST request on /board.
 
         global board, node_id, id, clock, vessel_list, node_id
 
@@ -184,11 +203,16 @@ try:
 
             # Build entry ID which will serve as a key for the board dictionary.
             element_id = str(clock) + str(node_id)
+            element_id = int(element_id)
 
-            # We add new element to dictionary using id as entry sequence.
-            add_new_element_to_store(str(element_id), new_entry)
+            # We add new element to dictionary using element_id as entry sequence.
+            add_new_element_to_store(element_id, new_entry)
+            
+            # It's not clear from the slides or the book if in the logical clock algorithm we have to increment the 
+            # clock value again here before propagation. We will try to do it and see what happens.
+            clock += 1
 
-            # Build path to propagate, using key word "add" and id as element_id.
+            # Path to propagate, key word "add". Also timestamp and element_id of the new entry.
             path = "/propagate/add/" + str(clock) + '/' + str(element_id)
 
             # Start thread so the server doesn't make the client wait.
@@ -202,13 +226,17 @@ try:
 
         return False
 
-    @app.post('/board/<element_id:int>/')
-    def client_action_received(element_id):
+    @app.post('/board/<element_seq:int>/')
+    def client_action_received(element_seq):
 
         global clock
 
         # Modify or delete an element in the board
         # Called directly when a user is doing a POST request on /board/<element_id:int>/
+
+        # In the web-app we display a sequence number instead of the real ID of the element, so now we have to
+        # retrieve the ID using the dictionary we built for this particular mapping.
+        element_id = seq_to_id[int(element_seq)]
 
         # Retrieving the ID of the action, which can be either 0 or 1.
         # 0 is received when the user clicks on "modify".
@@ -223,7 +251,10 @@ try:
             # Increment clock before event
             clock += 1
 
-            modify_element_in_store(str(element_id), new_entry)
+            modify_element_in_store(int(element_id), new_entry)
+
+            # Increment again before propagation.
+            clock += 1
 
             # Build path to propagate using keyword "mod" which stands for "modify".
             # Send the new timestamp, but don't change the message ID, send the original.
@@ -239,7 +270,10 @@ try:
             # Increment clock before event
             clock += 1
 
-            delete_element_from_store(entry_sequence=str(element_id))
+            delete_element_from_store(entry_sequence=int(element_id))
+
+            # Increment again before propagation.
+            clock += 1
 
             # Build path to propagate using keyword "del" which stands for "delete".
             # Send the new timestamp, but don't change the message ID, send the original.
@@ -263,35 +297,44 @@ try:
 
         if int(msg_timestamp) > clock:
             clock = int(msg_timestamp)
+
         clock += 1
 
         if action == "add":
+
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
-            add_new_element_to_store(msg_id, entry)
+            add_new_element_to_store(int(msg_id), entry)
 
         if action == "mod":
+
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
 
-            if msg_id not in board:
-                mod_queue[msg_id] = entry
+            # To consider the case in which a propagation about a modification arrives but the element to be modified
+            # is not been propagated yet, we keep a queue of element to modify: this queue will be checked every time
+            # the board is requested for displaying in the web-app, and it will be emptied when needed.
+            if int(msg_id) not in board:
+                mod_queue[int(msg_id)] = entry
             else:
-                modify_element_in_store(msg_id, entry)
+                modify_element_in_store(int(msg_id), entry)
 
         if action == "del":
 
-            if msg_id not in board:
-                del_queue[msg_id] = 1
+            # As for modify propagation above, we use a queue also for elements to be deleted.
+            if int(msg_id) not in board:
+                del_queue[int(msg_id)] = 1
             else:
-                delete_element_from_store(entry_sequence=msg_id)
+                delete_element_from_store(entry_sequence=int(msg_id))
 
         pass
 
     # ------------------------------------------------------------------------------------------------------
     # EXECUTION
     # ------------------------------------------------------------------------------------------------------
+
     # Execute the code
+
     def main():
         global vessel_list, node_id, app
 
@@ -313,6 +356,7 @@ try:
             print e
 
     # ------------------------------------------------------------------------------------------------------
+
     if __name__ == '__main__':
         main()
 

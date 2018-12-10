@@ -1,10 +1,15 @@
-for i in {1..9}; do
-if [i%2 -eq 0]
+#!/bin/bash
+
+for i in {1..10}; do
+r=$(($i%2))
+if [ $r -eq 0 ]
 then
-	curl -d "entry=t$i" -X 'POST' "http://10.1.0.$i/board" &
+	curl -d "entry=t$i" -X 'POST' "http://10.1.0.4/board"
+	sleep 1
 else
-	j = -$i
-	curl -d "entry=t$j" -X 'POST' "http://10.1.0.$i/board/<element_id:int>/" &
+	j=$(($i-1))
+	curl -d "entry=tMOD$j" "delete=0" -X 'POST' "http://10.1.0.4/board/$j/" 
+fi
 done
 
 
