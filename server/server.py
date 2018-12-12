@@ -66,12 +66,20 @@ try:
         board_display = {}
         seq_to_id = {}
         i = 1
-        for key, value in sorted(board.iteritems()):
+        for key, value in sorted(board.iteritems(), key=custom_sort):
             board_display[i] = value
             seq_to_id[i] = key
             i += 1
 
         return
+
+    def custom_sort(d):
+
+        key = str(d[0])
+
+        [ts, id] = key.split('.')
+
+        return int(ts), int(id)
 
     # ------------------------------------------------------------------------------------------------------
     # BOARD FUNCTIONS
@@ -167,10 +175,10 @@ try:
         check_mod_queue()
         check_del_queue()
 
-        update_board_display()
+         # update_board_display()
 
         return template('server/index.tpl', board_title='Vessel {}'.format(node_id),
-                        board_dict=sorted(board_display.iteritems()), members_name_string='YOUR NAME')
+                        board_dict=sorted(board.iteritems(), key=custom_sort), members_name_string='YOUR NAME')
 
     @app.get('/board')
     def get_board():
@@ -179,10 +187,10 @@ try:
         check_mod_queue()
         check_del_queue()
 
-        update_board_display()
+        # update_board_display()
 
         return template('server/boardcontents_template.tpl', board_title='Vessel {}'.format(node_id),
-                        board_dict=sorted(board_display.iteritems()))
+                        board_dict=sorted(board.iteritems(), key=custom_sort))
 
     # ------------------------------------------------------------------------------------------------------
 
@@ -202,8 +210,7 @@ try:
             clock += 1
 
             # Build entry ID which will serve as a key for the board dictionary.
-            element_id = str(clock) + str(node_id)
-            element_id = int(element_id)
+            element_id = str(clock) + '.' + str(node_id)
 
             # We add new element to dictionary using element_id as entry sequence.
             add_new_element_to_store(element_id, new_entry)
@@ -226,17 +233,18 @@ try:
 
         return False
 
-    @app.post('/board/<element_seq:int>/')
-    def client_action_received(element_seq):
+    @app.post('/board/<element_id:int>/')
+    def client_action_received(element_id):
 
         global clock
 
         # Modify or delete an element in the board
         # Called directly when a user is doing a POST request on /board/<element_id:int>/
 
+        # The following three lines can be ignored: idea that has been discarded.
         # In the web-app we display a sequence number instead of the real ID of the element, so now we have to
         # retrieve the ID using the dictionary we built for this particular mapping.
-        element_id = seq_to_id[int(element_seq)]
+        # element_id = seq_to_id[int(element_seq)]
 
         # Retrieving the ID of the action, which can be either 0 or 1.
         # 0 is received when the user clicks on "modify".
@@ -251,7 +259,7 @@ try:
             # Increment clock before event
             clock += 1
 
-            modify_element_in_store(int(element_id), new_entry)
+            modify_element_in_store(element_id, new_entry)
 
             # Increment again before propagation.
             clock += 1
@@ -270,7 +278,7 @@ try:
             # Increment clock before event
             clock += 1
 
-            delete_element_from_store(entry_sequence=int(element_id))
+            delete_element_from_store(entry_sequence=element_id)
 
             # Increment again before propagation.
             clock += 1
@@ -304,7 +312,7 @@ try:
 
             # We retrieve the new entry from the body of the POST request.
             entry = request.body.read()
-            add_new_element_to_store(int(msg_id), entry)
+            add_new_element_to_store(msg_id, entry)
 
         if action == "mod":
 
@@ -314,18 +322,18 @@ try:
             # To consider the case in which a propagation about a modification arrives but the element to be modified
             # is not been propagated yet, we keep a queue of element to modify: this queue will be checked every time
             # the board is requested for displaying in the web-app, and it will be emptied when needed.
-            if int(msg_id) not in board:
-                mod_queue[int(msg_id)] = entry
+            if msg_id not in board:
+                mod_queue[msg_id] = entry
             else:
-                modify_element_in_store(int(msg_id), entry)
+                modify_element_in_store(msg_id, entry)
 
         if action == "del":
 
             # As for modify propagation above, we use a queue also for elements to be deleted.
-            if int(msg_id) not in board:
-                del_queue[int(msg_id)] = 1
+            if msg_id not in board:
+                del_queue[msg_id] = 1
             else:
-                delete_element_from_store(entry_sequence=int(msg_id))
+                delete_element_from_store(entry_sequence=msg_id)
 
         pass
 
