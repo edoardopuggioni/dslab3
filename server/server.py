@@ -164,6 +164,15 @@ try:
                 if not success:
                     print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
 
+    def propagate_to_vessels_without(new_node_id, path, payload=None, req='POST'):
+        global vessel_list, node_id
+
+        for vessel_id, vessel_ip in vessel_list.items():
+            if int(vessel_id) != node_id or str(new_node_id) != str(vessel_id):  # don't propagate to yourself
+                success = contact_vessel(vessel_ip, path, payload, req)
+                if not success:
+                    print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
+
     # ------------------------------------------------------------------------------------------------------
     # ROUTES
     # ------------------------------------------------------------------------------------------------------
@@ -223,8 +232,8 @@ try:
 
             # We add new element to dictionary using element_id as entry sequence.
             add_new_element_to_store(element_id, new_entry)
-            
-            # It's not clear from the slides or the book if in the logical clock algorithm we have to increment the 
+
+            # It's not clear from the slides or the book if in the logical clock algorithm we have to increment the
             # clock value again here before propagation. We will try to do it and see what happens.
             clock += 1
 
@@ -266,6 +275,7 @@ try:
             # User wants to modify entry with ID given by element_id.
 
             new_entry = request.forms.get('entry')
+	    print "new entry = "+new_entry
 
             # Increment clock before event
             clock += 1
@@ -354,6 +364,73 @@ try:
 
         pass
 
+
+    # ------------------------------------------------------------------------------------------------------
+    # Optional task
+    # ------------------------------------------------------------------------------------------------------
+
+    @app.post('/addVessel/data/<element_id>/<node_id>')
+    def propagateData(element_id, node_id):
+        global vessel_list, clock
+
+        clock += 1
+        new_entry = request.body.read()
+        add_new_element_to_store(element_id, new_entry)
+
+        clock += 1
+
+        path = "/propagate/add/" + str(clock) + '/' + str(element_id)
+
+        # Start thread so the server doesn't make the client wait.
+        thread = Thread(target=propagate_to_vessels_without, args=(node_id, path, new_entry,))
+        thread.deamon = True
+        thread.start()
+
+        pass
+
+    @app.post('/addVessel/<new_node_id>/<new_node_ip>/<propagate>')
+    def addNewVessel(new_node_id, new_node_ip, propagate):
+        global vessel_list, node_id
+
+        if str(propagate) == "0":
+            path = "/addVessel/" + str(new_node_id) + '/' + str(new_node_ip) + "/1"
+
+            # Start thread so the server doesn't make the client wait.
+            thread = Thread(target=propagate_to_vessels, args=(path,))
+            thread.deamon = True
+            thread.start()
+
+        vessel_list[str(new_node_id)] = new_node_ip
+
+        for id, value in board.iteritems():
+            path = "/addVessel/data/" + str(id) + "/" + str(node_id)
+            # Start thread so the server doesn't make the client wait.
+            thread = Thread(target=contact_vessel, args=(new_node_ip, path, value,))
+            thread.deamon = True
+            thread.start()
+        pass
+
+
+    @app.post('/deleteVessel/<new_node_id>/<propagate>')
+    def deleteVessel(new_node_id, new_node_ip, propagate):
+        global vessel_list, node_id
+
+        if str(propagate) == "0":
+            path = "/deleteVessel/" + str(new_node_id) + '/1'
+
+            # Start thread so the server doesn't make the client wait.
+            thread = Thread(target=propagate_to_vessels, args=(path,))
+            thread.deamon = True
+            thread.start()
+
+        vessel_list[str(new_node_id)] = new_node_ip
+
+        pass
+
+
+
+
+
     # ------------------------------------------------------------------------------------------------------
     # EXECUTION
     # ------------------------------------------------------------------------------------------------------
@@ -373,6 +450,11 @@ try:
         vessel_list = dict()
         # We need to write the other vessels IP, based on the knowledge of their number
         for i in range(1, args.nbv+1):
+            # if str(node_id) <= str(5) and i <= 5:
+            #     vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
+            # elif str(node_id) > str(5) and i > 5:
+            #     vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
+
             vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
 
         try:
