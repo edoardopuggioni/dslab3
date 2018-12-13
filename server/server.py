@@ -355,7 +355,7 @@ try:
             if max <= int(id):
                 max = int(id)
         vessel_list[str(max + 1)] = new_node_ip
-        thread = Thread(target=propagateAllData, args=(new_node_ip))
+        thread = Thread(target=propagateAllData, args=(new_node_ip,))
         thread.deamon = True
         thread.start()
 
