@@ -373,9 +373,17 @@ try:
 
         pass
 
-    @app.post('/addVessel/<new_node_id>/<new_node_ip>')
-    def addNewVessel(new_node_id, new_node_ip):
+    @app.post('/addVessel/<new_node_id>/<new_node_ip>/<propagate>')
+    def addNewVessel(new_node_id, new_node_ip, propagate):
         global vessel_list, node_id
+
+        if str(propagate) == "0":
+            path = "/addVessel/" + str(new_node_id) + '/' + str(new_node_ip) + "/1"
+
+            # Start thread so the server doesn't make the client wait.
+            thread = Thread(target=propagate_to_vessels, args=(path,))
+            thread.deamon = True
+            thread.start()
 
         vessel_list[str(new_node_id)] = new_node_ip
 
@@ -385,6 +393,22 @@ try:
             thread = Thread(target=contact_vessel, args=(new_node_ip, path, value,))
             thread.deamon = True
             thread.start()
+        pass
+
+    @app.post('/deleteVessel/<new_node_id>/<propagate>')
+    def addNewVessel(new_node_id, new_node_ip, propagate):
+        global vessel_list, node_id
+
+        if str(propagate) == "0":
+            path = "/deleteVessel/" + str(new_node_id) + '/1'
+
+            # Start thread so the server doesn't make the client wait.
+            thread = Thread(target=propagate_to_vessels, args=(path,))
+            thread.deamon = True
+            thread.start()
+
+        vessel_list[str(new_node_id)] = new_node_ip
+
         pass
 
 
