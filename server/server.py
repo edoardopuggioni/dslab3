@@ -35,17 +35,14 @@ try:
     # Logical clock
     clock = 0
 
+    # mod_queue is a dictionary used to store a modification propagation that arrives to a node before the entry
+    # to modify. In this way, when the entry is finally propagated, we can modify it accordingly.
     mod_queue = {}
 
+    # del_queue works in the same way as mod_queue but for deleting entries.
     del_queue = {}
 
-    # Dictionary similar to board, used only to display the board on the web-app, to hide the internal IDs of the
-    # entries, showing instead simple sequence numbers 1, 2, 3, and so on.
-    board_display = {}
-
-    # Dictionary to map sequnce numbers to internal IDs.
-    seq_to_id = {}
-
+    # The following function will check the mod_queue dictionary and will apply the modifications contained.
     def check_mod_queue():
         global mod_queue
         for key in mod_queue:
@@ -54,6 +51,7 @@ try:
                 del mod_queue[key]
         return
 
+    # The following function will check the del_queue dictionary and will apply the deletes contained.
     def check_del_queue():
         for key in del_queue:
             if key in board:
@@ -61,20 +59,8 @@ try:
                 del del_queue[key]
         return
 
-    def update_board_display():
-
-        global board, board_display, seq_to_id
-
-        board_display = {}
-        seq_to_id = {}
-        i = 1
-        for key, value in sorted(board.iteritems(), key=custom_sort):
-            board_display[i] = value
-            seq_to_id[i] = key
-            i += 1
-
-        return
-
+    # This function will be passed to the sorted function as a parameter, in order to have a custom sorting of the
+    # board dictionary: first we sort using the clock, then using the id to break ties.
     def custom_sort(d):
 
         key = str(d[0])
@@ -164,6 +150,8 @@ try:
                 if not success:
                     print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
 
+    # In our optional task, we want to propagate the dictionary to all the node except one,
+    # the one which is the connection between the two pools of nodes.
     def propagate_to_vessels_without(new_node_id, path, payload=None, req='POST'):
         global vessel_list, node_id
 
@@ -181,25 +169,25 @@ try:
 
     @app.route('/')
     def index():
-        global board, node_id, board_display, seq_to_id
+        global board, node_id
 
+        # Every time the page is refreshed we check the queues to apply modifications or deletes.
         check_mod_queue()
         check_del_queue()
 
-         # update_board_display()
-
+        # In the sorted() function we pass custom_sort as parameter to have a custom sorting of the board dictionary.
         return template('server/index.tpl', board_title='Vessel {}'.format(node_id),
                         board_dict=sorted(board.iteritems(), key=custom_sort), members_name_string='YOUR NAME')
 
     @app.get('/board')
     def get_board():
-        global board, node_id, board_display, seq_to_id
+        global board, node_id
 
+        # Every time the page is refreshed we check the queues to apply modifications or deletes.
         check_mod_queue()
         check_del_queue()
 
-        # update_board_display()
-
+        # In the sorted() function we pass custom_sort as parameter to have a custom sorting of the board dictionary.
         return template('server/boardcontents_template.tpl', board_title='Vessel {}'.format(node_id),
                         board_dict=sorted(board.iteritems(), key=custom_sort))
 
@@ -213,12 +201,13 @@ try:
 
         global board, node_id, id, clock, vessel_list, node_id, first
 
-        if first:
-            filename = str(node_id) + "file.txt"
-            file = open(filename, "w")
-            file.write(str(time.time()) + "\n\n")
-            file.close()
-            first = False
+        # Printing in a file for measurements.
+        # if first:
+        #     filename = str(node_id) + "file.txt"
+        #     file = open(filename, "w")
+        #     file.write(str(time.time()) + "\n\n")
+        #     file.close()
+        #     first = False
 
         try:
 
@@ -234,7 +223,7 @@ try:
             add_new_element_to_store(element_id, new_entry)
 
             # It's not clear from the slides or the book if in the logical clock algorithm we have to increment the
-            # clock value again here before propagation. We will try to do it and see what happens.
+            # clock value again here before propagation.
             clock += 1
 
             # Path to propagate, key word "add". Also timestamp and element_id of the new entry.
@@ -259,11 +248,6 @@ try:
         # Modify or delete an element in the board
         # Called directly when a user is doing a POST request on /board/<element_id:int>/
 
-        # The following three lines can be ignored: idea that has been discarded.
-        # In the web-app we display a sequence number instead of the real ID of the element, so now we have to
-        # retrieve the ID using the dictionary we built for this particular mapping.
-        # element_id = seq_to_id[int(element_seq)]
-
         # Retrieving the ID of the action, which can be either 0 or 1.
         # 0 is received when the user clicks on "modify".
         # 1 is received when the user clicks on "delete".
@@ -275,7 +259,6 @@ try:
             # User wants to modify entry with ID given by element_id.
 
             new_entry = request.forms.get('entry')
-	    print "new entry = "+new_entry
 
             # Increment clock before event
             clock += 1
@@ -324,6 +307,8 @@ try:
         # add/modify/delete by using the variable element_id, and also in the case of add and modify, the new entry can
         # be retrieved from the body of the POST request.
 
+        # As explained in the slides and in the book, the logical clocks algorithms dictates that we should update the
+        # local logical clock as follows, when receiving a message.
         if int(msg_timestamp) > clock:
             clock = int(msg_timestamp)
 
@@ -335,11 +320,11 @@ try:
             entry = request.body.read()
             add_new_element_to_store(msg_id, entry)
 
-
-            filename = str(node_id) + "file.txt"
-            file = open(filename, "a")
-            file.write(str(time.time()) + "\n\n")
-            file.close()
+            # Printing in a file for measurements.
+            # filename = str(node_id) + "file.txt"
+            # file = open(filename, "a")
+            # file.write(str(time.time()) + "\n\n")
+            # file.close()
 
         if action == "mod":
 
@@ -369,29 +354,53 @@ try:
     # Optional task
     # ------------------------------------------------------------------------------------------------------
 
+    # We are going to do 2 pools of servers, each pool independant from each others.
+    # To do so, we are customazing the vessel_list of each other, the first pool will have a vessel-list of
+    # the vessels of the first pool, the same for the second pool.
+    # To connect the two pool, we a creating a route to add one node to a all the nodes in the pool
+
+    # The two pool of vessels are connected. They will then propagate all the data transmitted by the vessel from
+    # the other pool, without sending him back the same messages
+    # element_id : id of the element to add
+    # node_id : vessel to not propagate the data (the one who already sent the elements
+    # request.body.read() : value of the element to add
     @app.post('/addVessel/data/<element_id>/<node_id>')
     def propagateData(element_id, node_id):
         global vessel_list, clock
 
+        #make the clock consistent
+
         clock += 1
+
+        #add the entry to the dictionary
         new_entry = request.body.read()
         add_new_element_to_store(element_id, new_entry)
 
         clock += 1
 
+
         path = "/propagate/add/" + str(clock) + '/' + str(element_id)
 
-        # Start thread so the server doesn't make the client wait.
+        # Start thread so the server doesn't make the others wait. We propagate to all the nodes in
+        # our list without the one giving us the entries, the "node_id"
         thread = Thread(target=propagate_to_vessels_without, args=(node_id, path, new_entry,))
         thread.deamon = True
         thread.start()
 
         pass
 
+
+    # Adding one server to the vessel-list of all the nodes in the pool
+    # then contact the new server to propagate the data from this first pool
+    # new_node_id : id of the new node to add
+    # new_node_ip . ip of the new node to add
+    # propagate : "0" if propagate to the other, "1" if we are the others
     @app.post('/addVessel/<new_node_id>/<new_node_ip>/<propagate>')
     def addNewVessel(new_node_id, new_node_ip, propagate):
         global vessel_list, node_id
 
+        # we are the first node, we propagate to all the vessel in the pool
+        # a server to add, specify propagate : 1 to tell them not to propagate again
         if str(propagate) == "0":
             path = "/addVessel/" + str(new_node_id) + '/' + str(new_node_ip) + "/1"
 
@@ -400,8 +409,11 @@ try:
             thread.deamon = True
             thread.start()
 
+        # add the server to the vessel_list
         vessel_list[str(new_node_id)] = new_node_ip
 
+
+        # contact the new server to give him the data from this pool
         for id, value in board.iteritems():
             path = "/addVessel/data/" + str(id) + "/" + str(node_id)
             # Start thread so the server doesn't make the client wait.
@@ -410,11 +422,15 @@ try:
             thread.start()
         pass
 
-
+    # Delete one server to the vessel-list of all the nodes in the pool
+    # new_node_id : id of the new node to add
+    # propagate : "0" if propagate to the other, "1" if we are the others
     @app.post('/deleteVessel/<new_node_id>/<propagate>')
     def deleteVessel(new_node_id, new_node_ip, propagate):
         global vessel_list, node_id
 
+        # we are the first node, we propagate to all the vessel in the pool
+        # a server to add, specify propagate : 1 to tell them not to propagate again
         if str(propagate) == "0":
             path = "/deleteVessel/" + str(new_node_id) + '/1'
 
@@ -423,6 +439,7 @@ try:
             thread.deamon = True
             thread.start()
 
+        # add the server to the vessel_list
         vessel_list[str(new_node_id)] = new_node_ip
 
         pass
@@ -450,9 +467,9 @@ try:
         vessel_list = dict()
         # We need to write the other vessels IP, based on the knowledge of their number
         for i in range(1, args.nbv+1):
-            # if str(node_id) <= str(5) and i <= 5:
+            # if str(node_id) <= str(5) and i <= 5: #first pool of 5 vessels
             #     vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
-            # elif str(node_id) > str(5) and i > 5:
+            # elif str(node_id) > str(5) and i > 5: #second pool of the vessels
             #     vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
 
             vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
