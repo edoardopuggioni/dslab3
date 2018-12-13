@@ -354,7 +354,7 @@ try:
     # Optional task
     # ------------------------------------------------------------------------------------------------------
 
-    @app.get('/addVessel/data/<element_id>/<node_id>')
+    @app.post('/addVessel/data/<element_id>/<node_id>')
     def addNewVessel(element_id, node_id):
         global vessel_list, clock
 
