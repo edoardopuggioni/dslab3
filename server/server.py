@@ -166,7 +166,7 @@ try:
         global vessel_list, node_id
 
         for vessel_id, vessel_ip in vessel_list.items():
-            if int(vessel_id) != node_id || str(new_node_id) != str(vessel_id):  # don't propagate to yourself
+            if int(vessel_id) != node_id or str(new_node_id) != str(vessel_id):  # don't propagate to yourself
                 success = contact_vessel(vessel_ip, path, payload, req)
                 if not success:
                     print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
