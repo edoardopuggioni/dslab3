@@ -22,7 +22,7 @@ import math
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
 # Lab1Topology - class inheriting from mininet.topo.Topo, defines the network topology
-class Lab1Topology( Topo ):
+class Lab3Topology( Topo ):
     "Creates the network topology on which the lab 1 runs"
 #------------------------------------------------------------------------------------------------------
     # Initialize variables
@@ -63,7 +63,7 @@ class Lab1Topology( Topo ):
                 # We add link towards the reginal switch
                 self.addLink(switches[regionId], clients[globalId], bw = regionalLinkBandwidth, loss = regionalLinkLosses, delay = "%dms" % regionalDelay)
             # We must also connect the regional switch to the central switch
-            self.addLink(centralSwitch, switches[regionId], bw = globalLinkBandwidth, loss = globalLinkLosses, delay = "%dms" % globalDelay)
+            #self.addLink(centralSwitch, switches[regionId], bw = globalLinkBandwidth, loss = globalLinkLosses, delay = "%dms" % globalDelay)
 #------------------------------------------------------------------------------------------------------
 
 
@@ -92,11 +92,11 @@ class Lab():
     # run(self)
     # Run the lab 1
     def run(self):
-        '''Run the lab 1 simulation environment'''
+        '''Run the lab 3 simulation environment'''
 
         localJitter = 10 # ms, the evolution of the time between two consecutive packets
         # We create the topology
-        topology = Lab1Topology(nbOfServersPerRegion, nbOfClientsPerRegion, nbOfRegions)
+        topology = Lab3Topology(nbOfServersPerRegion, nbOfClientsPerRegion, nbOfRegions)
         # We create the simulation
         # Set the topology, the class for links and interfaces, the mininet environment must be cleaned up before launching, we should build now the topology
         simulation = Mininet(topo = topology, link = TCLink, intf = TCIntf, cleanup = True, build = True, ipBase='10.1.0.0/24')
