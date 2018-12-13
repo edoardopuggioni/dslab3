@@ -365,10 +365,10 @@ try:
 
     def propagateAllData(new_node_ip):
         for id, value in board.iteritems():
-            path = "/propagate/add/" + str(id) + '/' + str(id)
+            path = "/propagate/add/0/" + str(id)
 
             # Start thread so the server doesn't make the client wait.
-            thread = Thread(target=propagate_to_vessels, args=(path, value,))
+            thread = Thread(target=contact_vessel, args=(new_node_ip, path, value,))
             thread.deamon = True
             thread.start()
 
