@@ -1,8 +1,8 @@
 # coding=utf-8
 #------------------------------------------------------------------------------------------------------
-# TDA596 - Lab 1
+# TDA596 - Lab 3
 # This script creates the distributed system, runs the simulation and launches the servers app
-# Contains two classes: Lab1Topology and Lab1
+# Contains two classes: Lab3Topology and Lab3
 # This script does not need any modification
 # Author: Valentin Poirot <poirotv@chalmers.se>
 #------------------------------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ import math
 
 #------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------
-# Lab1Topology - class inheriting from mininet.topo.Topo, defines the network topology
+# Lab3Topology - class inheriting from mininet.topo.Topo, defines the network topology
 class Lab3Topology( Topo ):
     "Creates the network topology on which the lab 1 runs"
 #------------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ class Lab3Topology( Topo ):
                 # We add link towards the reginal switch
                 self.addLink(switches[regionId], clients[globalId], bw = regionalLinkBandwidth, loss = regionalLinkLosses, delay = "%dms" % regionalDelay)
             # We must also connect the regional switch to the central switch
-            #self.addLink(centralSwitch, switches[regionId], bw = globalLinkBandwidth, loss = globalLinkLosses, delay = "%dms" % globalDelay)
+            self.addLink(centralSwitch, switches[regionId], bw = globalLinkBandwidth, loss = globalLinkLosses, delay = "%dms" % globalDelay)
 #------------------------------------------------------------------------------------------------------
 
 
@@ -90,7 +90,7 @@ class Lab():
         makeTerm(node=server, cmd="python {} --id {} --vessels {}".format(self.pathToServer, server.IP().replace('10.1.0.',''), self.nbOfServersPerRegion*self.nbOfRegions))
 #------------------------------------------------------------------------------------------------------
     # run(self)
-    # Run the lab 1
+    # Run the lab 3
     def run(self):
         '''Run the lab 3 simulation environment'''
 

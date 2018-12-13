@@ -233,7 +233,7 @@ try:
 
         return False
 
-    @app.post('/board/<element_id:int>/')
+    @app.post('/board/<element_id>/')
     def client_action_received(element_id):
 
         global clock
@@ -250,11 +250,14 @@ try:
         # 0 is received when the user clicks on "modify".
         # 1 is received when the user clicks on "delete".
         delete = request.forms.get('delete')
+	print "delete = "+delete
+	
 
         if delete == "0":
             # User wants to modify entry with ID given by element_id.
 
             new_entry = request.forms.get('entry')
+	    print "new entry = "+new_entry
 
             # Increment clock before event
             clock += 1
@@ -355,7 +358,7 @@ try:
         node_id = args.nid
         vessel_list = dict()
         # We need to write the other vessels IP, based on the knowledge of their number
-        for i in range(1, args.nbv):
+        for i in range(1, args.nbv+1):
             vessel_list[str(i)] = '10.1.0.{}'.format(str(i))
 
         try:
