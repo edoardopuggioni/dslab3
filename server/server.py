@@ -162,6 +162,15 @@ try:
                 if not success:
                     print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
 
+    def propagate_to_vessels_without(new_node_id, path, payload=None, req='POST'):
+        global vessel_list, node_id
+
+        for vessel_id, vessel_ip in vessel_list.items():
+            if int(vessel_id) != node_id || str(new_node_id) != str(vessel_id):  # don't propagate to yourself
+                success = contact_vessel(vessel_ip, path, payload, req)
+                if not success:
+                    print "\n\nCould not contact vessel {}\n\n".format(vessel_id)
+
     # ------------------------------------------------------------------------------------------------------
     # ROUTES
     # ------------------------------------------------------------------------------------------------------
@@ -345,32 +354,42 @@ try:
     # Optional task
     # ------------------------------------------------------------------------------------------------------
 
-    @app.post('/addVessel/<new_node_ip>')
-    def addNewVessel(new_node_ip):
-        global vessel_list
+    @app.get('/addVessel/data/<element_id>/<node_id>')
+    def addNewVessel(element_id, node_id):
+        global vessel_list, clock
 
-        # we will take the maximum id through the board
-        max = -1;
-        for id in vessel_list:
-            if max <= int(id):
-                max = int(id)
-        vessel_list[str(max + 1)] = new_node_ip
-        thread = Thread(target=propagateAllData, args=(new_node_ip,))
+        clock += 1
+        new_entry = request.body.read()
+        add_new_element_to_store(element_id, new_entry)
+
+        clock += 1
+
+        path = "/propagate/add/" + str(clock) + '/' + str(element_id)
+
+        # Start thread so the server doesn't make the client wait.
+        thread = Thread(target=propagate_to_vessels_without, args=(node_id, path, new_entry,))
         thread.deamon = True
         thread.start()
 
-        print "new node added : "+str(new_node_ip)
-
         pass
 
-    def propagateAllData(new_node_ip):
-        for id, value in board.iteritems():
-            path = "/propagate/add/0/" + str(id)
+    @app.post('/addVessel/<new_node_id>/<new_node_ip>')
+    def addNewVessel(new_node_id, new_node_ip):
+        global vessel_list, node_id
 
+        vessel_list[str(new_node_id)] = new_node_ip
+
+        for id, value in board.iteritems():
+            path = "/addVessel/data/" + str(id) + "/" + str(node_id)
             # Start thread so the server doesn't make the client wait.
             thread = Thread(target=contact_vessel, args=(new_node_ip, path, value,))
             thread.deamon = True
             thread.start()
+        pass
+
+
+
+
 
     # ------------------------------------------------------------------------------------------------------
     # EXECUTION
