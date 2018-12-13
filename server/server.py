@@ -46,9 +46,9 @@ try:
 
     def check_mod_queue():
         global mod_queue
-        for key, value in mod_queue:
+        for key in mod_queue:
             if key in board:
-                modify_element_in_store(key, value)
+                modify_element_in_store(key, mod_queue[key])
                 del mod_queue[key]
         return
 
@@ -233,7 +233,7 @@ try:
 
         return False
 
-    @app.post('/board/<element_id:int>/')
+    @app.post('/board/<element_id>/')
     def client_action_received(element_id):
 
         global clock
@@ -250,6 +250,8 @@ try:
         # 0 is received when the user clicks on "modify".
         # 1 is received when the user clicks on "delete".
         delete = request.forms.get('delete')
+
+        element_id = str(element_id)
 
         if delete == "0":
             # User wants to modify entry with ID given by element_id.
