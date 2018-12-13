@@ -222,8 +222,7 @@ try:
             # We add new element to dictionary using element_id as entry sequence.
             add_new_element_to_store(element_id, new_entry)
 
-            # It's not clear from the slides or the book if in the logical clock algorithm we have to increment the
-            # clock value again here before propagation.
+            # Increment again before propagation.
             clock += 1
 
             # Path to propagate, key word "add". Also timestamp and element_id of the new entry.
@@ -443,9 +442,6 @@ try:
         vessel_list[str(new_node_id)] = new_node_ip
 
         pass
-
-
-
 
 
     # ------------------------------------------------------------------------------------------------------
