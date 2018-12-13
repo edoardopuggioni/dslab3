@@ -259,8 +259,6 @@ try:
         # 0 is received when the user clicks on "modify".
         # 1 is received when the user clicks on "delete".
         delete = request.forms.get('delete')
-	print "delete = "+delete
-
 
         if delete == "0":
             # User wants to modify entry with ID given by element_id.
@@ -355,7 +353,7 @@ try:
     # ------------------------------------------------------------------------------------------------------
 
     @app.post('/addVessel/data/<element_id>/<node_id>')
-    def addNewVessel(element_id, node_id):
+    def propagateData(element_id, node_id):
         global vessel_list, clock
 
         clock += 1
@@ -395,8 +393,9 @@ try:
             thread.start()
         pass
 
+
     @app.post('/deleteVessel/<new_node_id>/<propagate>')
-    def addNewVessel(new_node_id, new_node_ip, propagate):
+    def deleteVessel(new_node_id, new_node_ip, propagate):
         global vessel_list, node_id
 
         if str(propagate) == "0":
